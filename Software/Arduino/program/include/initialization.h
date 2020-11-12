@@ -7,14 +7,18 @@
 #define SDA 20
 
 #define PULSE_PIN 37
-#define DIR_PIN 35
-#define EN_PIN 33
+#define DIR_PIN   35
+#define EN_PIN    33
 
 #define TIMER1 1
 #define TIMER3 3
 
+#define FLOWPIN     A8
+#define PRESSUREPIN A9
+#define OXYGENPIN   A10
+
 int inspiration = 1;
-int expiration = 3;
+int expiration = 2;
 
 int breath_frequency = 10;
 
@@ -25,5 +29,9 @@ int step_count = 0;
 int phase = 0;
 
 bool MACHNE_ON = false;
+bool change_phase = false;
+bool SENDDATA = false;
 
 int mult_timer3=0;
+
+String serial_text;
