@@ -2,8 +2,12 @@
 #include <Thread.h>
 #include <ThreadController.h>
 #include <ArduinoJson.h>
+#include "RTClib.h"
 #include "initialization.h"
 
+
+
+RTC_DS1307 rtc;
 
 Thread phaseThread = Thread();
 Thread sendData = Thread();
@@ -67,7 +71,6 @@ void initPin(){
   pinMode(13,1);
 }
 
-
 void dir_out(){
 digitalWrite(DIR_PIN,HIGH); // Gerak keluar
 }
@@ -130,24 +133,41 @@ void phaseCallback(){
     phase++;
     delay(50);
     push = true;
-  }else if (phase==expiration)
+  }else if (phase>=expiration)
   {
     // Serial.println("reset");
     phase=0;
   }
+  else{
+    phase++;
+
+  }
   
 }
 
+float adc2cmh2o(float adc){
+  float cmh2o;
+  float gain = 100.0 /1000.0;
+  const float kPa2cmH2O = 10.19716;
+
+  cmh2o = kPa2cmH2O * ((( adc / 1023.0 * 5.0)/gain)/2.5);
+  // cmh2o = (((adc/1023.0f)*5)/gain)/2.5;
+  return cmh2o;
+
+}
 void sendDataCallback(){
   if(SENDDATA == false){
     return;
   }
   Serial.print("FL:");
-  Serial.print(flowSensor.current_output);
-  Serial.print("\tPS:");
+  // Serial.print(map(flowSensor.current_output,0,88,0,2));
   Serial.print(pressureSensor.current_output);
-  Serial.print("\t:");
-  Serial.print(millis());
+  Serial.print("\tPS:");
+  // Serial.print(map(pressureSensor.current_output, 0, 560, 0, 45));
+  Serial.print(adc2cmh2o(pressureSensor.current_output),6);
+  // Serial.print(pressureSensor.current_output);
+  // Serial.print("\t:");
+  // Serial.print(millis());
 
   Serial.println();
 
@@ -163,19 +183,29 @@ void serialEvent() {
       if(MACHNE_ON == true)
         return;
       Serial.println("Mesin Nyala");
-      phaseThread.setInterval(60000.0/((inspiration + expiration) * breath_frequency));
+      phaseThread.setInterval(60000.0f/((inspiration + expiration) * breath_frequency));
       calibratePosition();
       phase = 0;
       MACHNE_ON = true;
-    }else if(command == "stop")
+    }
+    else if(command == "stop")
     {
       MACHNE_ON = false;
       TCCR1A = 0;
       calibratePosition();
       Serial.println("Mesin Mati");
+    }
+    else if(command == "set")
+    {
+      expiration = doc["ie"];
+      breath_frequency = doc["f"];
     }    
   }
 }
+
+
+
+
 
 // -------------------------------------------------------------------------------------------------------- setup program
 void setup() {
@@ -187,10 +217,30 @@ void setup() {
   timerInit();
   Serial.println("Timer init done!");
   calibratePosition();
-  // delay(100);
+  delay(100);
   Serial.println("Calibrate position done!");
 
   Serial.println("Done!");
+
+  #ifndef ESP8266
+    while (!Serial); // wait for serial port to connect. Needed for native USB
+  #endif
+
+  // if (! rtc.begin()) {
+  //   Serial.println("Couldn't find RTC");
+  //   Serial.flush();
+  //   abort();
+  // }
+
+  if (! rtc.isrunning()) {
+    Serial.println("RTC is NOT running, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
 
   
   // put your setup code here, to run once:
@@ -210,11 +260,12 @@ void setup() {
   sendData.onRun(sendDataCallback);
   sendData.setInterval(10);
 
-  SENDDATA = false;
+  SENDDATA = true;
 }
 // -------------------------------------------------------------------------------------------------------- loop program
 void loop() {
   // put your main code here, to run repeatedly:
+  // DateTime time = rtc.now();
   if(phaseThread.shouldRun()){
     phaseThread.run();
   }
@@ -234,6 +285,7 @@ void loop() {
 // -------------------------------------------------------------------------------------------------------- ISR TIMER 1 COMPA
 ISR(TIMER1_COMPA_vect)          // timer compare interrupt service routine
 {
+
   digitalWrite(PULSE_PIN, digitalRead(PULSE_PIN) ^ 1);   // toggle LED pin
   
 }
