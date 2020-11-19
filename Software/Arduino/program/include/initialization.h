@@ -35,3 +35,7 @@ bool SENDDATA = false;
 int mult_timer3=0;
 
 String serial_text;
+
+float offset_pressure;
+
+float disp_volume=1, disp_oxygen=2, disp_flow=3;
