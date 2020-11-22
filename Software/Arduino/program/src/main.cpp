@@ -10,6 +10,7 @@ RTC_DS1307 rtc;
 Thread phaseThread = Thread();
 Thread sendData = Thread();
 Thread sendStaticData = Thread();
+Thread calcVolume = Thread();
 
 class SensorThread : public Thread
 {
@@ -27,6 +28,7 @@ public:
     current_input = analogRead(pin);
     current_output = alpha * current_input + (1 - alpha) * previous_output;
     previous_output = current_output;
+    // current_output = analogRead(pin);
     runned();
   }
 };
@@ -147,6 +149,7 @@ void phaseCallback()
   {
     // Serial.println("reset");
     phase = 0;
+    disp_volume = 0;
   }
   else
   {
@@ -155,6 +158,13 @@ void phaseCallback()
 }
 
 float adc2cmh2o(float adc)
+{
+  float flow;
+  float temp_val = map(flowSensor.current_output, 460, 570, 0, 50);
+  return flow;
+}
+
+float adc2flow(float adc)
 {
   float cmh2o;
   float gain = 100.0 / 1000.0;
@@ -180,11 +190,11 @@ void staticDispCallback()
   // Serial.println();
   Serial.print(77);
   Serial.print(",");
-  Serial.print(rand() % 100 + 1);
+  Serial.print(disp_volume);
   Serial.print(",");
-  Serial.print((adc2cmh2o(pressureSensor.current_output) - 26.70) * 2);
+  Serial.print(abs((adc2cmh2o(pressureSensor.current_output) - 26.70) * 2));
   Serial.print(",");
-  Serial.print(rand() % 100 + 1);
+  Serial.print(abs(map(flowSensor.current_output, 460, 570, 0, 50)));
   Serial.println();
 }
 
@@ -219,12 +229,11 @@ void sendDataCallback()
 
   Serial.print("59");
   Serial.print(",");
-  Serial.print(125.0f);
+  Serial.print(disp_volume);
   Serial.print(",");
-  Serial.print(flowSensor.current_output);
+  Serial.print(map(flowSensor.current_output, 460, 570, 0, 50));
   Serial.print(",");
-  Serial.print((adc2cmh2o(pressureSensor.current_output) - 26.70) * 2);
-
+  Serial.print((adc2cmh2o(pressureSensor.current_output) - 26.70));
   Serial.println();
 }
 
@@ -257,12 +266,22 @@ void serialEvent()
     }
     else if (command == "set")
     {
+      
       expiration = doc["ie"];
       breath_frequency = doc["f"];
+      phaseThread.setInterval(60000.0f / ((inspiration + expiration) * breath_frequency));
     }
   }
 }
 
+void calcVolumeCallback()
+{
+  // flowSensor.run();
+  // pressureSensor.run();
+  // flow_sensor_send = map(flowSensor.current_output, 460, 570, 0, 100);
+  // pressure_sensor_send = (adc2cmh2o(pressureSensor.current_output) - 26.70) * 2;
+  disp_volume += (map(flowSensor.current_output, 460, 570, 0, 100))/10;
+}
 // -------------------------------------------------------------------------------------------------------- setup program
 void setup()
 {
@@ -290,51 +309,50 @@ void setup()
   //   abort();
   // }
 
-  if (!rtc.isrunning())
-  {
-    Serial.println("RTC is NOT running, let's set the time!");
-    // When time needs to be set on a new device, or after a power loss, the
-    // following line sets the RTC to the date & time this sketch was compiled
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  }
+  // if (!rtc.isrunning())
+  // {
+  //   Serial.println("RTC is NOT running, let's set the time!");
+  //   // When time needs to be set on a new device, or after a power loss, the
+  //   // following line sets the RTC to the date & time this sketch was compiled
+  //   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  //   // This line sets the RTC with an explicit date & time, for example to set
+  //   // January 21, 2014 at 3am you would call:
+  //   // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  // }
 
   // put your setup code here, to run once:
   flowSensor.pin = FLOWPIN;
   pressureSensor.pin = PRESSUREPIN;
-  flowSensor.setInterval(100);
-  pressureSensor.setInterval(100);
-  flowSensor.alpha = 0.15;
+  flowSensor.setInterval(1);
+  pressureSensor.setInterval(1);
+  flowSensor.alpha = 0.08;
   pressureSensor.alpha = 0.15;
 
-  controller.add(&sendData);
-  controller.add(&flowSensor);
-  controller.add(&pressureSensor);
+  
 
   phaseThread.onRun(phaseCallback);
   phaseThread.setInterval(1500);
   sendData.onRun(sendDataCallback);
   sendData.setInterval(10);
   sendStaticData.onRun(staticDispCallback);
-  sendStaticData.setInterval(500);
-  calibrate();
-  SENDDATA = true;
+  sendStaticData.setInterval(200);
+  calcVolume.onRun(calcVolumeCallback);
+  calcVolume.setInterval(10);
+
+  controller.add(&sendData);
+  controller.add(&flowSensor);
+  controller.add(&pressureSensor);
+  controller.add(&sendStaticData);
+  controller.add(&calcVolume);
+  controller.add(&phaseThread);
+  // calibrate();
+  // SENDDATA = true;
 }
 // -------------------------------------------------------------------------------------------------------- loop program
 void loop()
 {
-  // put your main code here, to run repeatedly:
-  // DateTime time = rtc.now();
-  if (phaseThread.shouldRun())
-  {
-    phaseThread.run();
-  }
   controller.run();
-  // Serial.println("aaaa");
-  // Serial.println("cccc");
-
+  
   if (push)
   {
     // Serial.println("bbbb");

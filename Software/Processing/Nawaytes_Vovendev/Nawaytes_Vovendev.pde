@@ -15,7 +15,7 @@ Serial serial;
 ControlP5 cp5;
 
 Chart graph_volume, graph_flow, graph_pressure;
-PImage bgHome;
+PImage bg;
 Button btn_set, btn_start, btn_stop;
 Button btn_add_f, btn_add_ie, btn_min_f, btn_min_ie;
 
@@ -23,7 +23,7 @@ ListBox listCom;
 Textlabel txtlblWhichcom; 
 ListBox commListbox;
 ListBox portlist;
-
+Textfield txt_name, txt_age, txt_weight, txt_height;
 PFont font;
 //arialFont = loadFont("Arial", 32);
 
@@ -40,30 +40,45 @@ color white_ = color(255, 255, 255), black_ = color(0, 0, 0), pink_ = color(255,
 //ControlFont cf1 = new ControlFont(createFont("Arial",28,true),28);
 
 int SETFREQ=10, SETIE=3;
-float DISPVOLUME=0, DISPOXYGEN=0, DISPFLOW=0;
+float DISPVOLUME=0, DISPOXYGEN=0, DISPPRESSUSE=0;
 float val_graph_vol=0, val_graph_flow=0, val_graph_pressure=0;
 boolean firstload = true;
 
 JSONObject json_set;
 
+boolean isHome = true;
 void setup() {
-  //size(1024, 600);
-  noCursor();
-  fullScreen();
+  size(1024, 600);
+  //noCursor();
+  //fullScreen();
   font = createFont("Verdana", 10);
   cp5 = new ControlP5(this); 
-  bgHome = loadImage("home.png");
+  bg = loadImage("home.png");
   initJSON();
   setup_UART();
+  textfieldLayout();
   buttonLayout();
   graphLayout();
   mainValue();
+  setupTab();
   //robot.mouseMove(0,0);
   firstload = false;
+  //graph_flow.hide();
+  //graph_volume.hide();
+  //graph_pressure.hide();
 }
 
 void draw() {
-  background(bgHome);
-  mainValue();
-  serialStatus();
+  try {
+    background(bg);
+
+    if (isHome == false)
+      return;
+    mainValue();
+    serialStatus();
+    //hoverDetection();
+    //supText();
+  }
+  catch(Exception e) {
+  }
 }

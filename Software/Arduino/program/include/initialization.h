@@ -39,3 +39,5 @@ String serial_text;
 float offset_pressure;
 
 float disp_volume=1, disp_oxygen=2, disp_flow=3;
+
+float flow_sensor_send, pressure_sensor_send; 
